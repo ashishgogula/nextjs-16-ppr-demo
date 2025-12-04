@@ -122,12 +122,12 @@ Expected behavior:
 
 ## Deploying to Vercel
 
-1. Push this repository to GitHub.
+1. Fork or clone this repository to your GitHub account.
 2. Go to [https://vercel.com/new](https://vercel.com/new).
-3. Import the repository.
+3. Select the repository you want to deploy.
 4. Deploy with default settings.
 
-On Vercel’s production infrastructure:
+Once deployed:
 
 * `/ppr` shows true streaming behavior.
 * `/api/slow` runs dynamically on the server.
