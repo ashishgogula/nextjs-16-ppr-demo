@@ -4,59 +4,52 @@ This project is a minimal, production-ready demonstration of **Partial Prerender
 
 It shows the practical difference between:
 
-- **Blocking SSR** – the whole page waits for dynamic data.
-- **Partial Prerendering** – a static shell renders instantly, and dynamic content streams in later.
+* **Static Shell Rendering** – UI loads instantly.
+* **Dynamic Streaming** – slow data streams in once ready.
 
-Both routes use the same async Server Component (`SlowData`), but are wired differently to demonstrate how PPR changes the user experience.
+The demo uses an async Server Component (`SlowData`) and a simulated slow endpoint to clearly show how PPR behaves.
 
 ---
 
 ## Routes
 
-### `/with-ppr` – Partial Prerendering
+### `/ppr` – Partial Prerendering
 
-- Static shell is prerendered at build time.
-- The page header and static sections appear immediately.
-- Dynamic content is wrapped in `<Suspense>` with a visible fallback.
-- Once the slow server work finishes, the dynamic section streams in and replaces the fallback.
-
-### `/no-ppr` – Blocking SSR
-
-- Uses the same `SlowData` Server Component.
-- Still wrapped in `<Suspense>`, but with a `null` fallback.
-- The browser shows nothing until the slow server work completes.
-- The whole page appears at once after the delay.
+* The static shell is prerendered at build time.
+* Header and static sections appear instantly.
+* Dynamic content is wrapped in `<Suspense>` with a visible fallback.
+* When the slow server work finishes, the streamed result replaces the fallback.
 
 ### `/api/slow` – Dynamic API Route
 
-- Simple API route with an intentional delay (e.g. 5 seconds).
-- Always runs at request time.
-- Makes dynamic behavior obvious and consistent.
-- Avoids external network dependencies by using an internal API.
+* Simple endpoint with an intentional delay (5 seconds).
+* Always runs at request time.
+* Makes dynamic behavior predictable and easy to observe.
+* Uses an internal API call (`/api/slow`) to avoid external dependency issues.
 
 ---
 
 ## How PPR Fits Into Next.js 16
 
-Next.js 16 introduces **Cache Components**, which decide:
+Next.js 16 introduces **Cache Components**, which define:
 
-- What can be cached and prerendered statically.
-- What should be evaluated at request time.
-- How to split static vs dynamic work using Suspense.
+* What can be cached and served statically.
+* What must run dynamically on each request.
+* How to split static and dynamic rendering using `<Suspense>`.
 
 A route becomes a good PPR candidate when:
 
-- The layout and page can be rendered as a static shell.
-- Dynamic regions are isolated inside `<Suspense>` boundaries.
-- Dynamic data is fetched in async Server Components.
-- Data is treated as non-cacheable (for this demo) so request-time behavior is obvious.
+* The layout and outer UI can be rendered as a static shell.
+* Dynamic regions are isolated inside `<Suspense>` boundaries.
+* Dynamic data is fetched inside async Server Components.
+* Data is marked non-cacheable (`cache: "no-store"`) so the behavior is clear in demos.
 
 The result:
 
-- Fast initial render for the shell.
-- Dynamic regions stream in separately when ready.
+* Fast initial render of the static UI.
+* Dynamic content streams in separately when ready.
 
-This pattern maps directly to real-world pages like product detail pages, dashboards, and feeds.
+This pattern maps directly to real-world dashboard pages, feeds, product pages, and AI-driven apps.
 
 ---
 
@@ -67,24 +60,22 @@ app/
   api/
     slow/
       route.ts        # Dynamic API route with intentional delay
-  no-ppr/
-    page.tsx          # Blocking SSR example
-  with-ppr/
+  ppr/
     page.tsx          # PPR streaming example
-  layout.tsx          # Static layout (no async, no fonts)
+  layout.tsx          # Static layout (no async)
 components/
-  SlowData.tsx        # Async Server Component that calls the slow API
+  SlowData.tsx        # Async Server Component calling the slow API
   Skeleton.tsx        # Suspense fallback component
 lib/
   slowFetch.ts        # Helper that calls /api/slow with cache: "no-store"
-````
+```
 
 Key points:
 
-* `layout.tsx` is kept completely static to avoid disabling PPR.
+* `layout.tsx` is static to avoid disabling PPR.
 * `SlowData.tsx` is an async Server Component that performs the slow fetch.
-* `Skeleton.tsx` is a simple loading placeholder used as the Suspense fallback.
-* `slowFetch.ts` uses a relative fetch to `/api/slow` so it works locally and on Vercel.
+* `Skeleton.tsx` renders immediately as a Suspense fallback.
+* `slowFetch.ts` builds the correct absolute URL for local + production.
 
 ---
 
@@ -102,8 +93,8 @@ Development mode:
 npm run dev
 ```
 
-> Note: Partial Prerendering and streaming behavior are not accurately represented in `next dev`.
-> Use a production build to validate PPR and streaming.
+> Note: Streaming and PPR are not fully accurate in `next dev`.
+> Use a production build to validate real PPR behavior.
 
 Build for production:
 
@@ -119,13 +110,13 @@ npm start
 
 Then open:
 
-* `http://localhost:3000/with-ppr`
-* `http://localhost:3000/no-ppr`
+* `http://localhost:3000/ppr`
 
-You should see:
+Expected behavior:
 
-* `/with-ppr`: shell and fallback appear immediately, dynamic section appears after the delay.
-* `/no-ppr`: page stays blank until the delay completes, then the whole page appears at once.
+* Static UI appears instantly.
+* A skeleton loads immediately.
+* The dynamic streamed content appears after the delay.
 
 ---
 
@@ -138,40 +129,33 @@ You should see:
 
 On Vercel’s production infrastructure:
 
-* `/with-ppr` will show true streaming behavior.
-* `/no-ppr` will behave like a fully blocking SSR page.
-* `/api/slow` will run as a dynamic route.
+* `/ppr` shows true streaming behavior.
+* `/api/slow` runs dynamically on the server.
 
 ---
 
 ## Design Choices and Pitfalls Avoided
 
-This demo is intentionally structured to avoid common issues that break PPR and streaming in Next.js 16:
+This demo is structured to avoid common issues that disable PPR in Next.js 16:
 
 * No `async` layouts.
-* No `cookies()` or `headers()` in layout or pages.
-* No `dynamic`, `revalidate`, or legacy route config flags that conflict with `cacheComponents`.
-* No font loaders (`next/font`) in the layout, which can force dynamic rendering.
-* No client components wrapping the Suspense boundary.
+* No `cookies()` or `headers()` in layout.
+* No route config flags (`dynamic`, `revalidate`, etc.) that break PPR.
+* No font loaders (`next/font`), which force dynamic rendering.
+* No client components wrapping Suspense boundaries.
 
 Instead, it uses:
 
 * A static layout.
-* Async Server Component (`SlowData`) doing the dynamic work.
-* Suspense boundaries for splitting static and dynamic content.
-* An internal API route with an intentional delay.
-* `cache: "no-store"` to ensure request-time fetches.
+* Async Server Component (`SlowData`) to perform dynamic work.
+* Suspense to split static and dynamic rendering.
+* An internal API route with a controlled delay.
+* `cache: "no-store"` to force request-time evaluation.
 
-This makes the behavior of Partial Prerendering clear and reproducible.
+This ensures the behavior of Partial Prerendering is easy to understand and reliably reproducible.
 
 ---
 
 ## License
 
-MIT
-
-```
-
-This is pure GitHub Markdown: no MDX-only syntax, no JSX components outside code fences. You can save it as `README.md` and you’re done.
-::contentReference[oaicite:0]{index=0}
-```
+feel free to fork, modify, or use this as the basis for your own experiments.
